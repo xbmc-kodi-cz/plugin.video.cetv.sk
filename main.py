@@ -39,6 +39,7 @@ def EPISODES(url,page):
     for (url, title, thumb) in re.findall(r'<a href="(\S+?)" title="(.*?)">\s*<img src="(\S+?)"', httpdata):
         if 'cetv.sk' not in url:
            url=__baseurl__+url
+        title=unicode(title, encoding="utf-8", errors="ignore")
         title=h.unescape(title).encode('utf-8')
         addDir(title,url,3,thumb,1)
 
