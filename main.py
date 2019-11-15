@@ -94,7 +94,10 @@ def list_videos(category):
     # for this type of content.
     xbmcplugin.setContent(_handle, 'videos')
     # Get the list of videos in the category.
-    url=FEEDS[category]
+    if __baseurl__ not in category:
+        url=FEEDS[category]
+    else:
+        url=category
     httpdata = fetchUrl(url, "Loading categories...")
     parser=HTMLParser()
     for (url, title, thumb) in re.findall(r'<a href="(\S+?)" title="(.*?)">\s*<img src="(\S+?)"', httpdata):
@@ -102,7 +105,7 @@ def list_videos(category):
         title=parser.unescape(title).encode('utf-8')
         # Create a list item with a text label and a thumbnail image.
         list_item = xbmcgui.ListItem(label=title)
-    
+        thumb=__baseurl__+thumb
         # Set additional info for the list item.
         # 'mediatype' is needed for skin to display info for this ListItem correctly.
         list_item.setInfo('video', {'title': title,
@@ -117,8 +120,12 @@ def list_videos(category):
         # Add the list item to a virtual Kodi folder.
         # is_folder = False means that this item won't open any sub-list.
         is_folder = False
-
         xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
+    next=re.findall(r'<\/strong><a class="" href=\"(\S*?)\"',httpdata)
+    if next:
+        url = get_url(action='listing', category=__baseurl__ + next[0])
+        is_folder = True
+        xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label='Ďalšie'), is_folder)    
 
     xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_NONE)
     xbmcplugin.endOfDirectory(_handle)
@@ -138,6 +145,8 @@ def play_video(path):
         videolink=re.findall(r'source:\'(\S+?)\',',html)[0]
         play_item = xbmcgui.ListItem(path=videolink)
         # Pass the item to the Kodi player.
+        play_item.setProperty('inputstreamaddon','inputstream.adaptive')
+        play_item.setProperty('inputstream.adaptive.manifest_type','hls')
         xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
 
 
