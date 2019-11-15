@@ -138,8 +138,6 @@ def play_video(path):
         videolink=re.findall(r'source:\'(\S+?)\',',html)[0]
         play_item = xbmcgui.ListItem(path=videolink)
         # Pass the item to the Kodi player.
-        play_item.setProperty('inputstreamaddon','inputstream.adaptive')
-        play_item.setProperty('inputstream.adaptive.manifest_type','hls')
         xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
 
 
