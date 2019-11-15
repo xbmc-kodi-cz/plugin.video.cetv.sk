@@ -1,134 +1,179 @@
 # -*- coding: utf-8 -*-
-import urllib2,urllib,re,os
-import json
-from parseutils import *
-from stats import *
-import xbmcplugin,xbmcgui,xbmcaddon
+# Module: default
+# Author: rywko
+# Created on: 15.11.2019
+# License: GPL v.3 https://www.gnu.org/copyleft/gpl.html
+
+import sys, os
+from collections import OrderedDict
+from urllib import urlencode
+import urllib2
+from urlparse import parse_qsl
+import xbmc, xbmcgui, xbmcplugin, xbmcaddon
+import re
 from HTMLParser import HTMLParser
 
-_UserAgent_ = 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:60.0) Gecko/20100101 Firefox/60.0'
-addon = xbmcaddon.Addon('plugin.video.cetv.sk')
-profile = xbmc.translatePath(addon.getAddonInfo('profile'))
-__settings__ = xbmcaddon.Addon(id='plugin.video.cetv.sk')
+
+# Get the plugin url in plugin:// notation.
+_url = sys.argv[0]
+# Get the plugin handle as an integer number.
+_handle = int(sys.argv[1])
+_addon_ = xbmcaddon.Addon('plugin.video.cetv.sk')
+_scriptname_ = _addon_.getAddonInfo('name')
+home = _addon_.getAddonInfo('path')
 __baseurl__ = 'http://cetv.sk'
-home = __settings__.getAddonInfo('path')
-icon = xbmc.translatePath( os.path.join( home, 'icon.png' ) )
-fanart = xbmc.translatePath( os.path.join( home, 'fanart.jpg' ) )
-h=HTMLParser()
-
-#Nacteni informaci o doplnku
-__addon__      = xbmcaddon.Addon()
-__addonname__  = __addon__.getAddonInfo('name')
-__addonid__    = __addon__.getAddonInfo('id')
-__cwd__        = __addon__.getAddonInfo('path').decode("utf-8")
-__language__   = __addon__.getLocalizedString
-
-def OBSAH():
-    addDir('Spravodajstvo','http://cetv.sk/index.php/spravodajstvo',6,icon,1)
-    addDir('Publicistika','http://cetv.sk/index.php/publicistika',6,icon,1)
-    addDir('Šport','http://cetv.sk/index.php/sport',6,icon,1)
-    addDir('Relácie','http://cetv.sk/index.php/archiv/relacie',6,icon,1)
 
 
-def EPISODES(url,page):
+FEEDS = OrderedDict([        
+        ('Spravodajstvo','http://cetv.sk/index.php/spravodajstvo'),
+        ('Publicistika','http://cetv.sk/index.php/publicistika'),
+        ('Šport','http://cetv.sk/index.php/sport'),
+        ('Relácie','http://cetv.sk/index.php/archiv/relacie')
+        ])
+
+def log(msg, level=xbmc.LOGDEBUG):
+    if type(msg).__name__=='unicode':
+        msg = msg.encode('utf-8')
+    xbmc.log("[%s] %s"%(_scriptname_,msg.__str__()), level)
+
+def logDbg(msg):
+    log(msg,level=xbmc.LOGDEBUG)
+
+def logErr(msg):
+    log(msg,level=xbmc.LOGERROR)
+
+def fetchUrl(url, label):
+    logErr("fetchUrl " + url + ", label:" + label)
+    httpdata = ''	
     req = urllib2.Request(url)
-    req.add_header('User-Agent', _UserAgent_)
-    response = urllib2.urlopen(req)
-    httpdata = response.read()
-    response.close()
+    req.add_header('User-Agent','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0')
+    resp = urllib2.urlopen(req)
+    httpdata = resp.read()
+    resp.close()
+    return httpdata
+
+def get_url(**kwargs):
+    """
+    Create a URL for calling the plugin recursively from the given set of keyword arguments.
+
+    :param kwargs: "argument=value" pairs
+    :type kwargs: dict
+    :return: plugin call URL
+    :rtype: str
+    """
+    return '{0}?{1}'.format(_url, urlencode(kwargs))
+
+def list_categories():
+    """
+    Create the list of video categories in the Kodi interface.
+    """
+    xbmcplugin.setContent(_handle, 'videos')
+
+    for category in FEEDS.iterkeys():
+        list_item = xbmcgui.ListItem(label=category)
+      
+        url = get_url(action='listing', category=category)
+        is_folder = True
+        xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
+        logErr("category " + category + " added")
+    xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_UNSORTED)
+    
+    xbmcplugin.endOfDirectory(_handle)
+
+def list_videos(category):
+    """
+    Create the list of playable videos in the Kodi interface.
+
+    :param category: Category name
+    :type category: str
+    """
+    # Set plugin category. It is displayed in some skins as the name
+    # of the current section.
+    xbmcplugin.setPluginCategory(_handle, category)
+    # Set plugin content. It allows Kodi to select appropriate views
+    # for this type of content.
+    xbmcplugin.setContent(_handle, 'videos')
+    # Get the list of videos in the category.
+    url=FEEDS[category]
+    httpdata = fetchUrl(url, "Loading categories...")
+    parser=HTMLParser()
     for (url, title, thumb) in re.findall(r'<a href="(\S+?)" title="(.*?)">\s*<img src="(\S+?)"', httpdata):
-        if 'cetv.sk' not in url:
-           url=__baseurl__+url
         title=unicode(title, encoding="utf-8", errors="ignore")
-        title=h.unescape(title).encode('utf-8')
-        addDir(title,url,3,thumb,1)
+        title=parser.unescape(title).encode('utf-8')
+        # Create a list item with a text label and a thumbnail image.
+        list_item = xbmcgui.ListItem(label=title)
+    
+        # Set additional info for the list item.
+        # 'mediatype' is needed for skin to display info for this ListItem correctly.
+        list_item.setInfo('video', {'title': title,
+                                    'plot': '',
+                                    'mediatype': 'video'})
+                                    
+        list_item.setArt({'thumb': thumb, 'icon': thumb, 'fanart': thumb})
+
+        list_item.setProperty('IsPlayable', 'true')
+        
+        url='plugin://plugin.video.cetv.sk/?action=play&video=' + __baseurl__+ url
+        # Add the list item to a virtual Kodi folder.
+        # is_folder = False means that this item won't open any sub-list.
+        is_folder = False
+
+        xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
+
+    xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_NONE)
+    xbmcplugin.endOfDirectory(_handle)
 
 
-def VIDEOLINK(url,name):
-    req = urllib2.Request(url)
-    req.add_header('User-Agent', _UserAgent_)
-    response = urllib2.urlopen(req)
-    httpdata = response.read()
-    response.close()
-    desc=''
-    thumb=''
-    url=re.findall(r'source:\'(\S+?)\',',httpdata)[0]
-    addLink('video',url,thumb,desc)
+def play_video(path):
+    """
+    Play a video by the provided path.
 
-def get_params():
-        param=[]
-        paramstring=sys.argv[2]
-        if len(paramstring)>=2:
-                params=sys.argv[2]
-                cleanedparams=params.replace('?','')
-                if (params[len(params)-1]=='/'):
-                        params=params[0:len(params)-2]
-                pairsofparams=cleanedparams.split('&')
-                param={}
-                for i in range(len(pairsofparams)):
-                        splitparams={}
-                        splitparams=pairsofparams[i].split('=')
-                        if (len(splitparams))==2:
-                                param[splitparams[0]]=splitparams[1]
+    :param path: Fully-qualified video URL
+    :type path: str
+    """
+    # get video link
+    html = fetchUrl(path, "Loading video...")
+    print html
+    if html:
+        videolink=re.findall(r'source:\'(\S+?)\',',html)[0]
+        play_item = xbmcgui.ListItem(path=videolink)
+        # Pass the item to the Kodi player.
+        play_item.setProperty('inputstreamaddon','inputstream.adaptive')
+        play_item.setProperty('inputstream.adaptive.manifest_type','hls')
+        xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
 
-        return param
 
-def addLink(name,url,iconimage,popis):
-        ok=True
-        liz=xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
-        liz.setInfo( type="Video", infoLabels={ "Title": name, "Plot": popis} )
-        liz.setProperty( "Fanart_Image", fanart )
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=url,listitem=liz)
-        return ok
+def router(paramstring):
+    """
+    Router function that calls other functions
+    depending on the provided paramstring
 
-def addDir(name,url,mode,iconimage,page):
-        u=sys.argv[0]+"?url="+urllib.quote_plus(url)+"&mode="+str(mode)+"&name="+urllib.quote_plus(name)+"&page="+str(page)
-        ok=True
-        liz=xbmcgui.ListItem(name, iconImage="DefaultFolder.png", thumbnailImage=iconimage)
-        liz.setInfo( type="Video", infoLabels={ "Title": name } )
-        liz.setProperty( "Fanart_Image", fanart )
-        ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-        return ok
+    :param paramstring: URL encoded plugin paramstring
+    :type paramstring: str
+    """
+    # Parse a URL-encoded paramstring to the dictionary of
+    # {<parameter>: <value>} elements
+    params = dict(parse_qsl(paramstring))
+    # Check the parameters passed to the plugin
+    if params:
+        if params['action'] == 'listing':
+            # Display the list of videos in a provided category.
+            list_videos(params['category'])
+        elif params['action'] == 'play':
+            # Play a video from a provided URL.
+            play_video(params['video'])
+        else:
+            # If the provided paramstring does not contain a supported action
+            # we raise an exception. This helps to catch coding errors,
+            # e.g. typos in action names.
+            raise ValueError('Invalid paramstring: {0}!'.format(paramstring))
+    else:
+        # If the plugin is called from Kodi UI without any parameters,
+        # display the list of video categories
+        list_categories()
 
-params=get_params()
-url=None
-name=None
-thumb=None
-mode=None
-page=None
 
-try:
-        url=urllib.unquote_plus(params["url"])
-except:
-        pass
-try:
-        name=urllib.unquote_plus(params["name"])
-except:
-        pass
-try:
-        mode=int(params["mode"])
-except:
-        pass
-try:
-        page=int(params["page"])
-except:
-        pass
-
-print "Mode: "+str(mode)
-print "URL: "+str(url)
-print "Name: "+str(name)
-print "Page: "+str(page)
-
-if mode==None or url==None or len(url)<1:
-        STATS("OBSAH", "Function")
-        OBSAH()
-
-elif mode==6:
-        STATS("EPISODES", "Function")
-        EPISODES(url,page)
-
-elif mode==3:
-        STATS("VIDEOLINK", "Function")
-        VIDEOLINK(url,page)
-
-xbmcplugin.endOfDirectory(int(sys.argv[1]))
+if __name__ == '__main__':
+    # Call the router function and pass the plugin call parameters to it.
+    # We use string slicing to trim the leading '?' from the plugin call paramstring
+    router(sys.argv[2][1:])

@@ -1,11 +1,10 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <addon id="plugin.video.cetv.sk"
-version="0.1.1"
+version="0.1.2"
 name="Central TV"
 provider-name="rywko">
   <requires>
     <import addon="xbmc.python" version="2.14.0" />
-    <import addon="script.module.dmd-czech.common" version="1.5.5"/>
   </requires>
 	<extension point="xbmc.python.pluginsource" library="main.py">
 		<provides>video</provides>
