@@ -121,9 +121,9 @@ def list_videos(category):
         # is_folder = False means that this item won't open any sub-list.
         is_folder = False
         xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
-    next=re.findall(r'<\/strong><a class="" href=\"(\S*?)\"',httpdata)
+    next=re.search(r'<\/strong><a class="" href=\"(\S*?)\"',httpdata)
     if next:
-        url = get_url(action='listing', category=__baseurl__ + next[0])
+        url = get_url(action='listing', category=__baseurl__ + next.group(1))
         is_folder = True
         xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label='Ďalšie'), is_folder)    
 
@@ -140,9 +140,8 @@ def play_video(path):
     """
     # get video link
     html = fetchUrl(path, "Loading video...")
-    print html
     if html:
-        videolink=re.findall(r'source:\'(\S+?)\',',html)[0]
+        videolink=re.search(r'source:\'(\S+?)\',',html).group(1)
         play_item = xbmcgui.ListItem(path=videolink)
         # Pass the item to the Kodi player.
         xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
