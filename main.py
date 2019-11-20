@@ -25,10 +25,10 @@ __baseurl__ = 'http://cetv.sk'
 
 
 FEEDS = OrderedDict([        
-        ('Spravodajstvo','http://cetv.sk/index.php/spravodajstvo'),
-        ('Publicistika','http://cetv.sk/index.php/publicistika'),
-        ('Šport','http://cetv.sk/index.php/sport'),
-        ('Relácie','http://cetv.sk/index.php/archiv/relacie')
+        ('Spravodajstvo','http://cetv.sk/category/archiv/spravodajstvo/'),
+        ('Publicistika','http://cetv.sk/category/archiv/publicistika/'),
+        ('Šport','http://cetv.sk/category/archiv/sport/'),
+     #   ('Relácie','http://cetv.sk/category/archiv/relacie/')
         ])
 
 def log(msg, level=xbmc.LOGDEBUG):
@@ -87,43 +87,44 @@ def list_videos(category):
     :param category: Category name
     :type category: str
     """
-    # Set plugin category. It is displayed in some skins as the name
-    # of the current section.
-    xbmcplugin.setPluginCategory(_handle, category)
     # Set plugin content. It allows Kodi to select appropriate views
     # for this type of content.
     xbmcplugin.setContent(_handle, 'videos')
     # Get the list of videos in the category.
     if __baseurl__ not in category:
         url=FEEDS[category]
+        # Set plugin category. It is displayed in some skins as the name
+        # of the current section.
+        xbmcplugin.setPluginCategory(_handle, category)
     else:
         url=category
     httpdata = fetchUrl(url, "Loading categories...")
     parser=HTMLParser()
-    for (url, title, thumb) in re.findall(r'<a href="(\S+?)" title="(.*?)">\s*<img src="(\S+?)"', httpdata):
-        title=unicode(title, encoding="utf-8", errors="ignore")
-        title=parser.unescape(title).encode('utf-8')
+    for (data) in re.findall(r'<article class="penci-imgtype-landscape(.+?)<\/article>', httpdata, re.DOTALL):
+        title=re.search(r'rel="bookmark">(.+?)<\/a><\/h2>',data).group(1)
+        url=re.search(r'<a href="(\S+?)" rel="bookmark"',data).group(1)
+        plot=re.search(r'<div class="entry-content">(.*?)<\/div>',data).group(1)
+        thumb=re.search(r' data-src="(\S*?)">',data).group(1)
         # Create a list item with a text label and a thumbnail image.
         list_item = xbmcgui.ListItem(label=title)
-        thumb=__baseurl__+thumb
         # Set additional info for the list item.
         # 'mediatype' is needed for skin to display info for this ListItem correctly.
         list_item.setInfo('video', {'title': title,
-                                    'plot': '',
+                                    'plot': plot,
                                     'mediatype': 'video'})
                                     
         list_item.setArt({'thumb': thumb, 'icon': thumb, 'fanart': thumb})
 
         list_item.setProperty('IsPlayable', 'true')
         
-        url='plugin://plugin.video.cetv.sk/?action=play&video=' + __baseurl__+ url
+        url='plugin://plugin.video.cetv.sk/?action=play&video=' + url
         # Add the list item to a virtual Kodi folder.
         # is_folder = False means that this item won't open any sub-list.
         is_folder = False
         xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
-    next=re.search(r'<\/strong><a class="" href=\"(\S*?)\"',httpdata)
+    next=re.search(r'<a class="next page-numbers" href="(\S*?)"',httpdata)
     if next:
-        url = get_url(action='listing', category=__baseurl__ + next.group(1))
+        url = get_url(action='listing', category=next.group(1))
         is_folder = True
         xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label='Ďalšie'), is_folder)    
 
@@ -141,7 +142,7 @@ def play_video(path):
     # get video link
     html = fetchUrl(path, "Loading video...")
     if html:
-        videolink=re.search(r'source:\'(\S+?)\',',html).group(1)
+        videolink=re.search(r'src="(\S+?)"></video>',html).group(1)
         play_item = xbmcgui.ListItem(path=videolink)
         # Pass the item to the Kodi player.
         xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
