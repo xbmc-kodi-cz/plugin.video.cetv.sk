@@ -28,7 +28,7 @@ FEEDS = OrderedDict([
         ('Spravodajstvo','http://cetv.sk/category/archiv/spravodajstvo/'),
         ('Publicistika','http://cetv.sk/category/archiv/publicistika/'),
         ('Šport','http://cetv.sk/category/archiv/sport/'),
-     #   ('Relácie','http://cetv.sk/category/archiv/relacie/')
+        ('Relácie','http://cetv.sk/category/archiv/relacie/')
         ])
 
 def log(msg, level=xbmc.LOGDEBUG):
@@ -102,9 +102,12 @@ def list_videos(category):
     parser=HTMLParser()
     for (data) in re.findall(r'<article class="penci-imgtype-landscape(.+?)<\/article>', httpdata, re.DOTALL):
         title=re.search(r'rel="bookmark">(.+?)<\/a><\/h2>',data).group(1)
+        title=parser.unescape(title).encode('utf-8')
         url=re.search(r'<a href="(\S+?)" rel="bookmark"',data).group(1)
         plot=re.search(r'<div class="entry-content">(.*?)<\/div>',data).group(1)
-        thumb=re.search(r' data-src="(\S*?)">',data).group(1)
+        plot=parser.unescape(plot).encode('utf-8')
+        thumb=re.search(r' data-src="(\S*?)">',data)
+        thumb = thumb.group(1) if thumb else ''
         # Create a list item with a text label and a thumbnail image.
         list_item = xbmcgui.ListItem(label=title)
         # Set additional info for the list item.
@@ -142,7 +145,7 @@ def play_video(path):
     # get video link
     html = fetchUrl(path, "Loading video...")
     if html:
-        videolink=re.search(r'src="(\S+?)"></video>',html).group(1)
+        videolink=re.search(r'"(http:\/\/\S+?\.mp4)"',html).group(1)
         play_item = xbmcgui.ListItem(path=videolink)
         # Pass the item to the Kodi player.
         xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
