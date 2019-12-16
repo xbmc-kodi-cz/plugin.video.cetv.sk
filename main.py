@@ -101,8 +101,8 @@ def list_videos(category):
     httpdata = fetchUrl(url, "Loading categories...")
     parser=HTMLParser()
     for (data) in re.findall(r'<article class="penci-imgtype-landscape(.+?)<\/article>', httpdata, re.DOTALL):
-        title=re.search(r'rel="bookmark">(.+?)<\/a><\/h2>',data).group(1)
-        title=parser.unescape(title).encode('utf-8')
+        title=re.search(r'rel="bookmark">(.*?)<\/a><\/h2>',data)
+        title = parser.unescape(title.group(1)).encode('utf-8') if title else ''
         url=re.search(r'<a href="(\S+?)" rel="bookmark"',data).group(1)
         plot=re.search(r'<div class="entry-content">(.*?)<\/div>',data).group(1)
         plot=parser.unescape(plot).encode('utf-8')
