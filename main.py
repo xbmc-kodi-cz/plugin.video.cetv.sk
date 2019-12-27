@@ -49,6 +49,7 @@ def fetchUrl(url, label):
     req.add_header('User-Agent','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0')
     resp = urllib2.urlopen(req)
     httpdata = resp.read()
+    httpdata = unicode(httpdata,'utf-8')
     resp.close()
     return httpdata
 
@@ -102,10 +103,10 @@ def list_videos(category):
     parser=HTMLParser()
     for (data) in re.findall(r'<article class="penci-imgtype-landscape(.+?)<\/article>', httpdata, re.DOTALL):
         title=re.search(r'rel="bookmark">(.*?)<\/a><\/h2>',data)
-        title = parser.unescape(title.group(1)).encode('utf-8') if title else ''
+        title = parser.unescape(title.group(1)) if title else ''
         url=re.search(r'<a href="(\S+?)" rel="bookmark"',data).group(1)
         plot=re.search(r'<div class="entry-content">(.*?)<\/div>',data).group(1)
-        plot=parser.unescape(plot).encode('utf-8')
+        plot=parser.unescape(plot)
         thumb=re.search(r' data-src="(\S*?)">',data)
         thumb = thumb.group(1) if thumb else ''
         # Create a list item with a text label and a thumbnail image.
