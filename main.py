@@ -21,6 +21,7 @@ _handle = int(sys.argv[1])
 _addon_ = xbmcaddon.Addon('plugin.video.cetv.sk')
 _scriptname_ = _addon_.getAddonInfo('name')
 home = _addon_.getAddonInfo('path')
+LIVE_URL='http://213.81.153.221:8080/cetv'
 
 
 FEEDS = OrderedDict([        
@@ -71,7 +72,11 @@ def list_categories():
         is_folder = True
         xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
         logN("category " + category + " added")
+    list_item=xbmcgui.ListItem('Live vysielanie')
+    list_item.setInfo( type="Video", infoLabels={ "Title": 'Live vysielanie', "Plot": ''} )
+    xbmcplugin.addDirectoryItem(_handle,LIVE_URL,list_item, False)
     xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_UNSORTED)
+
     
     xbmcplugin.endOfDirectory(_handle)
 
@@ -167,3 +172,4 @@ if __name__ == '__main__':
     # Call the router function and pass the plugin call parameters to it.
     # We use string slicing to trim the leading '?' from the plugin call paramstring
     router(sys.argv[2][1:])
+
