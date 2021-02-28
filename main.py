@@ -6,11 +6,12 @@
 
 import sys, os
 from collections import OrderedDict
-from urllib.parse import urlencode, parse_qsl
-import urllib.request, urllib.error, urllib.parse
+from urllib import urlencode
+import urllib2
+from urlparse import parse_qsl
 import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 import re
-from html.parser import HTMLParser
+from HTMLParser import HTMLParser
 
 
 # Get the plugin url in plugin:// notation.
@@ -20,6 +21,7 @@ _handle = int(sys.argv[1])
 _addon_ = xbmcaddon.Addon('plugin.video.cetv.sk')
 _scriptname_ = _addon_.getAddonInfo('name')
 home = _addon_.getAddonInfo('path')
+LIVE_URL='http://213.81.153.221:8080/cetv'
 
 
 FEEDS = OrderedDict([        
@@ -35,15 +37,16 @@ def log(msg, level=xbmc.LOGDEBUG):
     xbmc.log("[%s] %s"%(_scriptname_,msg.__str__()), level)
 
 def logN(msg):
-    log(msg,level=xbmc.LOGINFO)
+    log(msg,level=xbmc.LOGNOTICE)
 
 def fetchUrl(url, label):
     logN("fetchUrl " + url + ", label:" + label)
     httpdata = ''	
-    req = urllib.request.Request(url)
+    req = urllib2.Request(url)
     req.add_header('User-Agent','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0')
-    resp = urllib.request.urlopen(req)
-    httpdata = resp.read().decode('utf-8')
+    resp = urllib2.urlopen(req)
+    httpdata = resp.read()
+    httpdata = unicode(httpdata,'utf-8')
     resp.close()
     return httpdata
 
@@ -63,13 +66,18 @@ def list_categories():
     Create the list of video categories in the Kodi interface.
     """
     xbmcplugin.setContent(_handle, 'videos')
-    for category in FEEDS.keys():
+    for category in FEEDS.iterkeys():
         list_item = xbmcgui.ListItem(label=category)
         url = get_url(action='listing', url=FEEDS[category])
         is_folder = True
         xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
         logN("category " + category + " added")
+    list_item=xbmcgui.ListItem('Live vysielanie')
+    list_item.setInfo( type="Video", infoLabels={ "Title": 'Live vysielanie', "Plot": ''} )
+    xbmcplugin.addDirectoryItem(_handle,LIVE_URL,list_item, False)
     xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_UNSORTED)
+
+    
     xbmcplugin.endOfDirectory(_handle)
 
 def list_videos(url):
