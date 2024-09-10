@@ -124,7 +124,7 @@ def play_video(path):
     # get video link
     html = fetchUrl(path, "Loading video...")
     if html:
-        videolink=re.search(r'"(http:\/\/\S+?\.mp4)"',html).group(1)
+        videolink=re.search(r'"(https:\/\/\S+?\.mp4)"',html).group(1)
         play_item = xbmcgui.ListItem(path=videolink)
         # Pass the item to the Kodi player.
         xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
