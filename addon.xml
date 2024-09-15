@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <addon id="plugin.video.cetv.sk"
-version="1.0.0"
+version="1.0.1"
 name="Central TV"
-provider-name="rywko">
+provider-name="rywko, fixed by VincoNafta">
   <requires>
     <import addon="xbmc.python" version="3.0.0" />
   </requires>
