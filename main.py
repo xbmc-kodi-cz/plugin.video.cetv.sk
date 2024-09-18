@@ -4,14 +4,18 @@
 # Created on: 15.11.2019
 # License: GPL v.3 https://www.gnu.org/copyleft/gpl.html
 
-import sys, os
+import re
+import sys
 from collections import OrderedDict
 from urllib.parse import urlencode, parse_qsl
-import urllib.request, urllib.error, urllib.parse
-import xbmc, xbmcgui, xbmcplugin, xbmcaddon
-import re
-from html.parser import HTMLParser
 
+import urllib3
+import xbmc
+import xbmcaddon
+import xbmcgui
+import xbmcplugin
+# from html.parser import HTMLParser
+from bs4 import BeautifulSoup
 
 # Get the plugin url in plugin:// notation.
 _url = sys.argv[0]
@@ -21,31 +25,39 @@ _addon_ = xbmcaddon.Addon('plugin.video.cetv.sk')
 _scriptname_ = _addon_.getAddonInfo('name')
 home = _addon_.getAddonInfo('path')
 
+FEEDS = OrderedDict([
+    ('Spravodajstvo', 'http://cetv.sk/category/archiv/spravodajstvo/'),
+    ('Publicistika', 'http://cetv.sk/category/archiv/publicistika/'),
+    ('Šport', 'http://cetv.sk/category/archiv/sport/'),
+    ('Relácie', 'http://cetv.sk/category/archiv/relacie/')
+])
 
-FEEDS = OrderedDict([        
-        ('Spravodajstvo','http://cetv.sk/category/archiv/spravodajstvo/'),
-        ('Publicistika','http://cetv.sk/category/archiv/publicistika/'),
-        ('Šport','http://cetv.sk/category/archiv/sport/'),
-        ('Relácie','http://cetv.sk/category/archiv/relacie/')
-        ])
 
 def log(msg, level=xbmc.LOGDEBUG):
-    if type(msg).__name__=='unicode':
+    if type(msg).__name__ == 'unicode':
         msg = msg.encode('utf-8')
-    xbmc.log("[%s] %s"%(_scriptname_,msg.__str__()), level)
+    xbmc.log("[%s] %s" % (_scriptname_, msg.__str__()), level)
+
 
 def logN(msg):
-    log(msg,level=xbmc.LOGINFO)
+    log(msg, level=xbmc.LOGINFO)
 
-def fetchUrl(url, label):
-    logN("fetchUrl " + url + ", label:" + label)
-    httpdata = ''	
-    req = urllib.request.Request(url)
-    req.add_header('User-Agent','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0')
-    resp = urllib.request.urlopen(req)
-    httpdata = resp.read().decode('utf-8')
-    resp.close()
-    return httpdata
+
+# def fetchUrl(url, label):
+#     logN("fetchUrl " + url + ", label:" + label)
+#     httpdata = ''
+#     req = urllib.request.Request(url)
+#     req.add_header('User-Agent','Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0')
+#     resp = urllib.request.urlopen(req)
+#     httpdata = resp.read().decode('utf-8')
+#     resp.close()
+#     return httpdata
+
+def search(page):
+    user_agent = {'user-agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0"}
+    http = urllib3.PoolManager(1, headers=user_agent)
+    return http.request("GET", page).data.decode("utf-8")
+
 
 def get_url(**kwargs):
     """
@@ -58,6 +70,7 @@ def get_url(**kwargs):
     """
     return '{0}?{1}'.format(_url, urlencode(kwargs))
 
+
 def list_categories():
     """
     Create the list of video categories in the Kodi interface.
@@ -66,11 +79,12 @@ def list_categories():
     for category in FEEDS.keys():
         list_item = xbmcgui.ListItem(label=category)
         url = get_url(action='listing', url=FEEDS[category])
-        is_folder = True
-        xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
+        # is_folder = True
+        xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
         logN("category " + category + " added")
-    xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_UNSORTED)
+    # xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_UNSORTED)
     xbmcplugin.endOfDirectory(_handle)
+
 
 def list_videos(url):
     """
@@ -79,16 +93,15 @@ def list_videos(url):
     :param url: Url to video directory
     :type url: str
     """
-    httpdata = fetchUrl(url, "Loading categories...")
-    parser=HTMLParser()
-    for (data) in re.findall(r'<article class="penci-imgtype-landscape(.+?)<\/article>', httpdata, re.DOTALL):
-        title=re.search(r'rel="bookmark">(.*?)<\/a><\/h2>',data)
-        title = parser.unescape(title.group(1)) if title else ''
-        url=re.search(r'<a href="(\S+?)" rel="bookmark"',data).group(1)
-        plot=re.search(r'<div class="entry-content">(.*?)<\/div>',data).group(1)
-        plot=parser.unescape(plot)
-        thumb=re.search(r' data-src="(\S*?)">',data)
-        thumb = thumb.group(1) if thumb else ''
+    httpdata = search(url)
+    raw_html_data = BeautifulSoup(httpdata, "html.parser").find_all("article", class_="penci-imgtype-landscape")
+    # parser=HTMLParser()
+    for (data) in raw_html_data:
+        titledata = data.find("h2", class_="entry-title").find("a")
+        title = titledata.text
+        url = titledata["href"]
+        plot = data.find("div", class_="entry-content").text
+        thumb = data.find("a", class_="penci-link-post")["data-src"]
         # Create a list item with a text label and a thumbnail image.
         list_item = xbmcgui.ListItem(label=title)
         # Set additional info for the list item.
@@ -101,15 +114,14 @@ def list_videos(url):
         url = get_url(action='play', video=url)
         # Add the list item to a virtual Kodi folder.
         # is_folder = False means that this item won't open any sub-list.
-        is_folder = False
-        xbmcplugin.addDirectoryItem(_handle, url, list_item, is_folder)
-		
-    next=re.search(r'<a class="next page-numbers" href="(\S*?)"',httpdata)
+        xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
+
+    next = re.search(r'<a class="next page-numbers" href="(\S*?)"', httpdata)
     if next:
         url = get_url(action='listing', url=next.group(1))
         is_folder = True
-        xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label='Ďalšie'), is_folder)    
-		
+        xbmcplugin.addDirectoryItem(_handle, url, xbmcgui.ListItem(label='Ďalšie'), is_folder)
+
     xbmcplugin.addSortMethod(_handle, xbmcplugin.SORT_METHOD_NONE)
     xbmcplugin.endOfDirectory(_handle)
 
@@ -122,9 +134,10 @@ def play_video(path):
     :type path: str
     """
     # get video link
-    html = fetchUrl(path, "Loading video...")
+    html = search(path)
     if html:
-        videolink=re.search(r'"(http:\/\/\S+?\.mp4)"',html).group(1)
+        videolink = BeautifulSoup(html, "html.parser").find("video")["src"]
+        xbmc.log(videolink)
         play_item = xbmcgui.ListItem(path=videolink)
         # Pass the item to the Kodi player.
         xbmcplugin.setResolvedUrl(_handle, True, listitem=play_item)
@@ -164,4 +177,3 @@ if __name__ == '__main__':
     # Call the router function and pass the plugin call parameters to it.
     # We use string slicing to trim the leading '?' from the plugin call paramstring
     router(sys.argv[2][1:])
-
